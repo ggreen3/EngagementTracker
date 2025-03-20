@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import threading
 from playwright.async_api import async_playwright
 
-# Load environment variables from Render
+# Load environment variables
 load_dotenv()
 
 # Replace placeholders with environment variables
@@ -41,94 +41,123 @@ def save_to_txt(data):
 # Scrape engagement metrics using Playwright's Async API
 async def scrape_metrics(url):
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)  # Launch headless browser
-        page = await browser.new_page()
         try:
-            await page.goto(url, timeout=30000)  # Wait up to 30 seconds for the page to load
+            browser = await p.chromium.launch(headless=True)  # Launch headless browser
+            page = await browser.new_page()
+
+            # Navigate to the URL with a timeout of 30 seconds
+            await page.goto(url, timeout=30000)
+
+            # Default values in case scraping fails
+            likes = 0
+            shares = 0
+            comments = 0
+
+            if "twitter.com" in url or "x.com" in url:
+                # Scrape Twitter/X metrics
+                try:
+                    await page.wait_for_selector('div[data-testid="like"]', timeout=10000)
+                    like_element = await page.query_selector('div[data-testid="like"]')
+                    likes = int((await like_element.inner_text()).strip().replace(",", "")) if like_element else 0
+                except Exception:
+                    pass
+
+                try:
+                    await page.wait_for_selector('div[data-testid="retweet"]', timeout=10000)
+                    share_element = await page.query_selector('div[data-testid="retweet"]')
+                    shares = int((await share_element.inner_text()).strip().replace(",", "")) if share_element else 0
+                except Exception:
+                    pass
+
+                try:
+                    await page.wait_for_selector('div[data-testid="reply"]', timeout=10000)
+                    comment_element = await page.query_selector('div[data-testid="reply"]')
+                    comments = int((await comment_element.inner_text()).strip().replace(",", "")) if comment_element else 0
+                except Exception:
+                    pass
+
+            elif "threads.net" in url:
+                # Scrape Threads metrics
+                try:
+                    await page.wait_for_selector('span:has-text("Likes")', timeout=10000)
+                    like_element = await page.query_selector('span:has-text("Likes")')
+                    likes = int((await like_element.inner_text()).strip().replace(",", "")) if like_element else 0
+                except Exception:
+                    pass
+
+                # Threads doesn't have shares or comments in the same way, so set to 0
+                shares = 0
+                comments = 0
+
+            elif "youtube.com" in url:
+                # Scrape YouTube metrics
+                try:
+                    await page.wait_for_selector('#segmented-like-button > yt-formatted-string', timeout=10000)
+                    like_element = await page.query_selector('#segmented-like-button > yt-formatted-string')
+                    likes = int((await like_element.inner_text()).strip().replace(",", "")) if like_element else 0
+                except Exception:
+                    pass
+
+                # YouTube doesn't have "shares" or "comments" easily accessible, so set to 0
+                shares = 0
+                comments = 0
+
+            elif "tiktok.com" in url:
+                # Scrape TikTok metrics
+                try:
+                    await page.wait_for_selector('strong[data-e2e="like-count"]', timeout=10000)
+                    like_element = await page.query_selector('strong[data-e2e="like-count"]')
+                    likes = int((await like_element.inner_text()).strip().replace(",", "")) if like_element else 0
+                except Exception:
+                    pass
+
+                try:
+                    await page.wait_for_selector('strong[data-e2e="share-count"]', timeout=10000)
+                    share_element = await page.query_selector('strong[data-e2e="share-count"]')
+                    shares = int((await share_element.inner_text()).strip().replace(",", "")) if share_element else 0
+                except Exception:
+                    pass
+
+                try:
+                    await page.wait_for_selector('strong[data-e2e="comment-count"]', timeout=10000)
+                    comment_element = await page.query_selector('strong[data-e2e="comment-count"]')
+                    comments = int((await comment_element.inner_text()).strip().replace(",", "")) if comment_element else 0
+                except Exception:
+                    pass
+
+            elif "instagram.com" in url:
+                # Scrape Instagram metrics
+                try:
+                    await page.wait_for_selector('section.x9f619 > span > a > span', timeout=10000)
+                    like_element = await page.query_selector('section.x9f619 > span > a > span')
+                    likes = int((await like_element.inner_text()).strip().replace(",", "")) if like_element else 0
+                except Exception:
+                    pass
+
+                try:
+                    await page.wait_for_selector('span._aauw', timeout=10000)
+                    comment_element = await page.query_selector('span._aauw')
+                    comments = int((await comment_element.inner_text()).strip().replace(",", "")) if comment_element else 0
+                except Exception:
+                    pass
+
+                # Instagram doesn't display shares directly, so set to 0
+                shares = 0
+
+            else:
+                await browser.close()
+                return {"error": "❌ Unsupported platform. Please submit a link from Twitter, Threads, YouTube, TikTok, or Instagram."}
+
+            await browser.close()
+
+            return {
+                "likes": likes,
+                "shares": shares,
+                "comments": comments
+            }
+
         except Exception as e:
-            await browser.close()
-            return {"error": f"❌ Failed to load the page: {e}"}
-
-        # Default values in case scraping fails
-        likes = 0
-        shares = 0
-        comments = 0
-
-        if "twitter.com" in url or "x.com" in url:
-            # Scrape Twitter/X metrics
-            try:
-                like_element = await page.query_selector('div[data-testid="like"]')
-                likes = int((await like_element.inner_text()).strip().replace(",", "")) if like_element else 0
-            except Exception:
-                pass
-
-            try:
-                share_element = await page.query_selector('div[data-testid="retweet"]')
-                shares = int((await share_element.inner_text()).strip().replace(",", "")) if share_element else 0
-            except Exception:
-                pass
-
-            try:
-                comment_element = await page.query_selector('div[data-testid="reply"]')
-                comments = int((await comment_element.inner_text()).strip().replace(",", "")) if comment_element else 0
-            except Exception:
-                pass
-
-        elif "threads.net" in url:
-            # Scrape Threads metrics
-            try:
-                like_element = await page.query_selector('span:has-text("Likes")')
-                likes = int((await like_element.inner_text()).strip().replace(",", "")) if like_element else 0
-            except Exception:
-                pass
-
-            # Threads doesn't have shares or comments in the same way, so set to 0
-            shares = 0
-            comments = 0
-
-        elif "youtube.com" in url:
-            # Scrape YouTube metrics
-            try:
-                like_element = await page.query_selector('#segmented-like-button > yt-formatted-string')
-                likes = int((await like_element.inner_text()).strip().replace(",", "")) if like_element else 0
-            except Exception:
-                pass
-
-            # YouTube doesn't have "shares" or "comments" easily accessible, so set to 0
-            shares = 0
-            comments = 0
-
-        elif "tiktok.com" in url:
-            # Scrape TikTok metrics
-            try:
-                like_element = await page.query_selector('strong[data-e2e="like-count"]')
-                likes = int((await like_element.inner_text()).strip().replace(",", "")) if like_element else 0
-            except Exception:
-                pass
-
-            try:
-                share_element = await page.query_selector('strong[data-e2e="share-count"]')
-                shares = int((await share_element.inner_text()).strip().replace(",", "")) if share_element else 0
-            except Exception:
-                pass
-
-            try:
-                comment_element = await page.query_selector('strong[data-e2e="comment-count"]')
-                comments = int((await comment_element.inner_text()).strip().replace(",", "")) if comment_element else 0
-            except Exception:
-                pass
-
-        else:
-            await browser.close()
-            return {"error": "❌ Unsupported platform. Please submit a link from Twitter, Threads, YouTube, or TikTok."}
-
-        await browser.close()
-
-        return {
-            "likes": likes,
-            "shares": shares,
-            "comments": comments
-        }
+            return {"error": f"❌ Failed to process submission: {e}"}
 
 # Command: !submit
 @bot.command()
