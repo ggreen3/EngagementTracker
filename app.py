@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 from discord.ext import commands
 from playwright.async_api import async_playwright
 import discord  # Ensure this line is present
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import threading
 
 # Load environment variables from .env file
 load_dotenv()
@@ -95,6 +97,20 @@ async def rankings(ctx):
     except Exception as e:
         logging.error(f"Error in rankings command: {e}")
         await ctx.send("⚠️ Oops! ❌ Failed to fetch rankings.")
+
+# Dummy HTTP server to satisfy Render's port requirement
+class DummyServer(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is running!")
+
+def run_dummy_server():
+    server = HTTPServer(('0.0.0.0', 8000), DummyServer)
+    server.serve_forever()
+
+# Start the dummy HTTP server in a separate thread
+threading.Thread(target=run_dummy_server, daemon=True).start()
 
 # Run the bot
 if __name__ == "__main__":
