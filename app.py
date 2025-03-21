@@ -3,6 +3,7 @@ import logging
 from dotenv import load_dotenv
 from discord.ext import commands
 from playwright.async_api import async_playwright
+import discord  # Ensure this line is present
 
 # Load environment variables from .env file
 load_dotenv()
@@ -17,7 +18,7 @@ if not DISCORD_TOKEN:
 
 # Bot setup with privileged intents
 intents = discord.Intents.default()
-intents.messages = True  # Enable message content intent
+intents.messages = True  # Enable access to message content
 intents.message_content = True  # Explicitly enable message content intent
 
 bot = commands.Bot(command_prefix="!", intents=intents)
